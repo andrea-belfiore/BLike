@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-# version: v3 (adapted for the Cartwheel paper, Salvaggio et al 2022)
-# date: 2022/10/15
+# version: v4 (adapted for the Cartwheel paper, Salvaggio et al 2022)
+# date: 2022/10/22
 # author: mario <andrea.belfiore@inaf.it>
 # name: test_variability_Zezas_CWP.py
 # description:
@@ -33,13 +33,13 @@
 #      detected flux: 1.1190e-14 +/- 1.3563e-15
 #      Obs "9807" Counts On=52 Off=19 bkg_ratio=14.6956 signif=14.2962
 #      detected flux: 8.2838e-15 +/- 1.1754e-15
-#      variability between obs 1 and obs 2: TS = 19.0976  Z = 4.3701
-#      variability between obs 1 and obs 3: TS = 6.2220  Z = 2.4944
-#      variability between obs 2 and obs 3: TS = 2.6401  Z = 1.6248
-#     max variability: TS = 19.0976  Z = 4.1239
+#      variability between obs 1 and obs 2: TS = 19.1289  Z = 4.3737
+#      variability between obs 1 and obs 3: TS = 6.2405  Z = 2.4981
+#      variability between obs 2 and obs 3: TS = 2.6402  Z = 1.6249
+#     max variability: TS = 19.1289  Z = 4.1276
 #
 #   Mind the difference in the TS to Z-score (N sigma) conversion, due to the
-#   number of trials: TS = 19.0976 corresponds 4.3 sigma in single trial, but
+#   number of trials: TS = 19.1289 corresponds 4.3 sigma in single trial, but
 #   it becomes 4.1 sigma after trial correction.
 #
 # input data format:
@@ -73,7 +73,7 @@
 import sys, argparse
 import numpy as np
 from scipy.stats import norm, chi2
-from BLike import BLike # >=v7
+from BLike import BLike # >=v8
 
 def main():
   # read the command line and the input data
@@ -145,7 +145,7 @@ def compare(L_a, L_b, c2f_a, c2f_b, n_steps, accuracy, chatter):
     if chatter > 1:
       print("    flux: %.6e  TS: %f = %f + %f" % \
           (flux, TS, L_a.TS(flux/c2f_a), L_b.TS(flux/c2f_b)))
-    if TS < TS_opt:
+    if TS > TS_opt:
       TS_opt = TS
       flux_opt = flux
 
@@ -165,7 +165,7 @@ def compare(L_a, L_b, c2f_a, c2f_b, n_steps, accuracy, chatter):
     while (flux_max - flux_min) / flux_opt > accuracy:
       flux_ave = (flux_max + flux_min) / 2.
       TS_ave = L_a.TS(flux_ave/c2f_a) + L_b.TS(flux_ave/c2f_b)
-      if TS_min < TS_max:
+      if TS_min > TS_max:
         TS_max = TS_ave
         flux_max = flux_ave
       else:
@@ -173,7 +173,7 @@ def compare(L_a, L_b, c2f_a, c2f_b, n_steps, accuracy, chatter):
         flux_min = flux_ave
   TS_best_a = L_a.TS(L_a.MostLikely())
   TS_best_b = L_b.TS(L_b.MostLikely())
-  dTS = TS_ave - (TS_best_a + TS_best_b)
+  dTS = (TS_best_a + TS_best_b) - TS_ave
   return dTS
 
 def TS2Z(TS, Ntrial):

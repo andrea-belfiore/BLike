@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-# version: v3 (adapted for the Cartwheel paper, Salvaggio et al 2022)
-# date: 2022/10/15
+# version: v4 (adapted for the Cartwheel paper, Salvaggio et al 2022)
+# date: 2022/10/22
 # author: mario <andrea.belfiore@inaf.it>
 # name: fit_constant_5obs_CWP.py
 # description:
@@ -36,8 +36,8 @@
 #      detected flux: 5.4661e-15 +/- 9.5400e-16
 #      Obs "9807" Counts On=27 Off=26 bkg_ratio=33.5604 signif=10.8398
 #      detected flux: 4.3193e-15 +/- 8.4981e-16
-#     average flux: 4.6602e-15 -3.3721e-16 +4.1337e-16 erg/cm2/s
-#     TS variability: 11.1492  Pval: 2.4937e-02  Z: 2.2424
+#     average flux: 4.6644e-15 -3.4136e-16 +4.1370e-16 erg/cm2/s
+#     TS variability: 11.1465  Pval: 2.4966e-02  Z: 2.2419
 #
 # input data format:
 #   Each row corresponds to a source from 1 up.
@@ -70,7 +70,7 @@
 import sys, argparse
 import numpy as np
 from scipy.stats import norm, chi2
-from BLike import BLike # >=v7
+from BLike import BLike # >=v8
 
 def main():
   # read the command line and the input data
@@ -127,9 +127,9 @@ def main():
     TS = sum([l.TS(flux/x) for l, x in zip(L, c2f)])
     if chatter > 1:
       print("    flux: %.6e  TS: %f = %f + %f + %f + %f + %f" % (flux, TS, \
-          L[0].TS(flux/c2f[0]), L[1].TS(flux/sc2f[1]), L[2].TS(flux/c2f[2]), \
-          L[3].TS(flux/c2f[3]), L[4].TS(flux/sc2f[4])))
-    if TS < TS_opt:
+          L[0].TS(flux/c2f[0]), L[1].TS(flux/c2f[1]), L[2].TS(flux/c2f[2]), \
+          L[3].TS(flux/c2f[3]), L[4].TS(flux/c2f[4])))
+    if TS > TS_opt:
       TS_opt = TS
       flux_opt = flux
 
@@ -149,7 +149,7 @@ def main():
     while (flux_max - flux_min) / flux_opt > Options.accuracy:
       flux_ave = (flux_max + flux_min) / 2.
       TS_ave = sum([l.TS(flux_ave/x) for l, x in zip(L, c2f)])
-      if TS_min < TS_max:
+      if TS_min > TS_max:
         TS_max = TS_ave
         flux_max = flux_ave
       else:
@@ -157,7 +157,7 @@ def main():
         flux_min = flux_ave
 
   # compute the uncertainty on the average flux
-  TS_unc = TS_ave + np.power(norm.isf((1 - Options.coverage)/2), 2)
+  TS_unc = TS_ave - np.power(norm.isf((1 - Options.coverage)/2), 2)
   flux_min = 0.
   flux_max = 2. * np.max(flux_best)
   flux_lo = flux_max
@@ -170,9 +170,9 @@ def main():
     TS = sum([l.TS(flux/x) for l, x in zip(L, c2f)])
     if chatter > 1:
       print("    flux: %.6e  TS: %f = %f + %f + %f + %f + %f" % (flux, TS, \
-          L[0].TS(flux/c2f[0]), L[1].TS(flux/sc2f[1]), L[2].TS(flux/c2f[2]), \
-          L[3].TS(flux/c2f[3]), L[4].TS(flux/sc2f[4])))
-    if TS < TS_unc:
+          L[0].TS(flux/c2f[0]), L[1].TS(flux/c2f[1]), L[2].TS(flux/c2f[2]), \
+          L[3].TS(flux/c2f[3]), L[4].TS(flux/c2f[4])))
+    if TS > TS_unc:
       if flux < flux_lo:
         flux_lo = flux
       if flux > flux_hi:
@@ -184,17 +184,17 @@ def main():
   # refine the uncertainty
   for flux in np.linspace(flux_lo - dflux, flux_lo + dflux, n_steps):
     TS = sum([l.TS(flux/x) for l, x in zip(L, c2f)])
-    if TS < TS_unc:
+    if TS > TS_unc:
       if flux < flux_lo:
         flux_lo = flux
   for flux in np.linspace(flux_hi - dflux, flux_hi + dflux, n_steps):
     TS = sum([l.TS(flux/x) for l, x in zip(L, c2f)])
-    if TS < TS_unc:
+    if TS > TS_unc:
       if flux > flux_hi:
         flux_hi = flux
 
   # compute and print out the results
-  dTS = TS_ave - sum(TS_best)
+  dTS = sum(TS_best) - TS_ave
   Pval = chi2.sf(float(dTS), len(TS_best) - 1)
   Zscore = norm.isf(Pval/2)
   print("average flux: %.4e -%.4e +%.4e erg/cm2/s" %

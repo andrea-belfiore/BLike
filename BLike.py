@@ -1,5 +1,5 @@
-# version: v7
-# date: 2022/10/15
+# version: v8
+# date: 2022/10/22
 # author: mario <andrea.belfiore@inaf.it>
 # name: BLike.py
 # description:
@@ -16,6 +16,7 @@
 #   v5 - some explicit casting required by recent python
 #   v6 - internals as float128 to manage larger counts
 #   v7 - highest density interval (HDI) and other methods
+#   v8 - profile likelihood and TS
 
 ## by now, let's assume the user has numpy and scipy installed
 import numpy as np # polyval exp log
@@ -61,6 +62,16 @@ class BLike:
     self.bkg_ratio = bkg_ratio
     self.N_on = int(N_on)
     self.N_off = int(N_off)
+
+    # coefficients of the maximum profile likelihood
+    self.__Am = (self.N_off - self.N_on) / (self.bkg_ratio + 1.)
+    self.__Ap = (self.N_off + self.N_on) / (self.bkg_ratio + 1.)
+    if self.N_off < self.bkg_ratio * self.N_on:
+      self.__base_off = self.N_off / self.bkg_ratio
+      self.__base_on = self.N_on
+    else:
+      self.__base_off = self.__Ap
+      self.__base_on = self.__Ap
 
     # polynomial coefficients of the Likelihood (V)
     # of its derivative (W) and its integral (U)
@@ -209,6 +220,24 @@ class BLike:
       self.__arg_max = (hi + lo) / 2.
     self.__max_like = self.__Get(self.__arg_max)
 
+  def __GetBackground(self, mu_src):
+    """Compute the value of the most likely expected counts from background"""
+    """in the On measure, for a given expected counts from the source."""
+    R = np.sqrt(mu_src**2 + 2 * self.__Am * mu_src + self.__Ap**2)
+    # these maximise the combined likelihood function, accounting also for
+    # the outcome of the Off measure and the bkg ratio
+    return R / 2. + self.__Ap / 2. - mu_src / 2.
+
+  def __GetLogProfile(self, mu_src):
+    """Compute the logarithm of the profile Likelihood function for a given"""
+    """expected counts from the source alone"""
+    mu_bkg = self.__GetBackground(mu_src)
+    mu_tot = mu_src + mu_bkg * (self.bkg_ratio + 1.)
+    # the profile likelihood is normalised at 1 in its maximum
+    return (self.N_on + self.N_off - mu_tot) + \
+        self.N_off * np.log(mu_bkg / self.__base_off) + \
+        self.N_on * np.log((mu_src + mu_bkg) / self.__base_on)
+
   def Significance(self, return_Pvalue=False):
     """Compute the significance of the signal [Zhang & Ramsden (1989)]"""
     # the Null Hypothesis is no-signal.
@@ -225,8 +254,15 @@ class BLike:
     # convert the P-value into a Z-score (two-sided)
     return PvalToZscore(Pval)
 
-  def MostLikely(self, accuracy=1.e-3):
+  def MostLikely(self, accuracy=1.e-3, marginal=True):
     """Return the value that maximizes the Likelihood"""
+    # this is the exact maximum of the profile likelihood
+    if not marginal:
+      if self.N_off > self.bkg_ratio * self.N_on:
+        return 0.
+      else:
+        return self.N_on - self.N_off / self.bkg_ratio
+
     # set a minimum and maximum accuracy
     if accuracy > .1:
       accuracy = .1
@@ -315,14 +351,12 @@ class BLike:
     return self.Quantile(1. - coverage, accuracy)
 
   def TS(self, x=0.):
-    """Compute the value of the Test Statistic (-2*logLike) at x"""
+    """Compute the value of the Test Statistic (TS = 2*logLike) at x"""
+    """TS<=0 and TS=0 only at the peak of the profile likelihood"""
     if (x < 0.):
-      return 0.
-    if self.N_on == 0:
-      return 2.*x
-    self.__ComputeCoefficientsV()
+      return -1. * float("inf")
 
-    return 2.*(x - np.log(Polynomial(self.__V, x)))
+    return 2. * self.__GetLogProfile(x)
 
   def ErrorBar(self, up=True, coverage=.682689492137, accuracy=1e-3):
     """Compute the uncertainty in the maximum Likelihood estimator"""
