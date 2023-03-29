@@ -6,7 +6,7 @@ for and characterise the variability of faint X-ray sources.
 You can use them to reproduce the results of table 4 in our
 paper: "The largest bright ULX population in a galaxy: X-ray
 variability and Luminosity Function in the Cartwheel ring Galaxy"
-(Salvaggio et al 2022).
+(Salvaggio et al 2023, https://arxiv.org/abs/2303.15502).
 
 BLike is a python module that implements a class, BLike, that
 describes an On-Off pair of measurements. This is a typical
